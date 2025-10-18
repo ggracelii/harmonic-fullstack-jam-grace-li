@@ -20,19 +20,19 @@ The default value is blank, ensuring users must intentionally pick a valid list.
 Users can add from "My List" to either of the other two lists. Users cannot add from either of those tow lists to My List. sicne that contains all the companeis and wouldnt' make logical sense to add companies there
 
 ### 4. Filtered Move Rules
-The modal filters which lists can be moved **to** based on the current list:
-- Users can move companies **from "My List"** to either of the other two lists.  
+The modal filters which lists can be moved to based on the current list:
+- Users can move companies from **My List** to either of the other two lists.  
 - Users can move companies from **Liked Companies List** and **Companies To Ignore List** to each other only.
 - Users cannot move companies from either **Liked Companies List** and **Companies To Ignore List** back to **My List**, which already contains all companies.
 
-### 5. Progress Toast
+### 5. Progress Bar
 A  **progress bar** shows the status of each background move job in real time.
 - Blue: active progress  
 - Green: completed  
 - Red: failed  
-If the job is completed successfully, a message with the total numebr of items moves and duplicates skipped is displayed.
-If the job fails, a failure emssage is dispalyed.
-Both of these messages disappear after 8 seconds.
+When a job completes successfully, a message displays the total number of items moved and the number of duplicates skipped.
+If the job fails, a failure message is shown instead.
+Both messages automatically disappear after 8 seconds.
 
 ### 6. Fun Facts Panel
 A  **“Fun facts”** box appears above the progress text/bar.  
