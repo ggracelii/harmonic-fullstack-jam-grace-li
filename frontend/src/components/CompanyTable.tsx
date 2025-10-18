@@ -13,8 +13,10 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getCollectionsById, ICompany } from "../utils/jam-api";
 
-/** Minimal types + API calls kept local so no other files change */
+// Types for API responses
 type CollectionMeta = { id: string; collection_name: string };
+
+// Move job status type
 type MoveJob = {
   jobId: string;
   status: "queued" | "running" | "completed" | "failed";
@@ -23,14 +25,19 @@ type MoveJob = {
   duplicates: number;
 };
 
+// API base URL
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-/** Frontend-only helpers for the new endpoints */
+// API functions
+
+// Fetch collections metadata
 async function fetchCollections(): Promise<CollectionMeta[]> {
   const r = await fetch(`${API}/collections`);
   if (!r.ok) throw new Error("Failed to load collections");
   return r.json();
 }
+
+// Start a move job
 async function startMove(body: any): Promise<MoveJob> {
   const r = await fetch(`${API}/moves/batch`, {
     method: "POST",
@@ -40,41 +47,41 @@ async function startMove(body: any): Promise<MoveJob> {
   if (!r.ok) throw new Error("Failed to start move");
   return r.json();
 }
+
+// Get move job status
 async function getJob(jobId: string): Promise<MoveJob> {
   const r = await fetch(`${API}/moves/jobs/${jobId}`);
   if (!r.ok) throw new Error("Failed to load job");
   return r.json();
 }
 
-/** Cross-page selection model */
+// Selection mode type
 type SelectionMode =
   | { type: "explicit"; ids: Set<number> }
   | { type: "all"; deselectedIds: Set<number> };
 
+// CompanyTable component
 const CompanyTable = (props: { selectedCollectionId: string }) => {
-  // Original state
+  // State variables
   const [response, setResponse] = useState<ICompany[]>([]);
   const [total, setTotal] = useState<number>();
   const [offset, setOffset] = useState<number>(0);
   const [pageSize, setPageSize] = useState(25);
 
-  // New: selection state (select-all across all results)
   const [mode, setMode] = useState<SelectionMode>({
     type: "explicit",
     ids: new Set(),
   });
   const pageIds = useMemo(() => response.map((r) => r.id), [response]);
 
-  // New: move modal + lists
   const [collections, setCollections] = useState<CollectionMeta[]>([]);
   const [moveOpen, setMoveOpen] = useState(false);
   const [targetListId, setTargetListId] = useState<string>("");
 
-  // New: background job progress
   const [jobId, setJobId] = useState<string | null>(null);
   const [job, setJob] = useState<MoveJob | null>(null);
 
-  // Fetch page (original)
+  // Fetch companies when collection ID, offset, or page size changes
   useEffect(() => {
     getCollectionsById(props.selectedCollectionId, offset, pageSize).then(
       (newResponse) => {
@@ -84,32 +91,28 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     );
   }, [props.selectedCollectionId, offset, pageSize]);
 
-  // Reset page and selection when the list changes (minimal)
+  // Reset selection mode when collection ID changes
   useEffect(() => {
     setOffset(0);
     setMode({ type: "explicit", ids: new Set() });
   }, [props.selectedCollectionId]);
 
-  // Load lists for destination choices (once)
+  // Fetch collections metadata on mount
   useEffect(() => {
     fetchCollections().then(setCollections).catch(() => setCollections([]));
   }, []);
 
+  // Determine source list based on selected collection ID
   const sourceList = useMemo(
     () => collections.find(c => c.id === props.selectedCollectionId),
     [collections, props.selectedCollectionId]
   );
 
-  // Allowed targets based on source list name
+  // Determine allowed target lists for moving companies
   const allowedTargets = useMemo(() => {
     if (!sourceList) return [];
     const name = sourceList.collection_name;
 
-    // Rules:
-    // - "My List" -> can move to the other two
-    // - "Liked Companies List" -> only "Companies to Ignore List"
-    // - "Companies to Ignore List" -> only "Liked Companies List"
-    // - No one can target "My List"
     if (name === "My List") {
       return collections.filter(c => c.collection_name !== "My List");
     }
@@ -119,13 +122,13 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     if (name === "Companies to Ignore List") {
       return collections.filter(c => c.collection_name === "Liked Companies List");
     }
-    // Fallback: exclude My List and self
+
     return collections.filter(
       c => c.collection_name !== "My List" && c.id !== sourceList.id
     );
   }, [collections, sourceList]);
 
-  // DataGrid selection shown for the current page only, derived from global selection mode
+  // Compute row selection model based on selection mode
   const rowSelectionModel: GridRowSelectionModel = useMemo(() => {
     if (mode.type === "all") {
       return pageIds.filter((id) => !mode.deselectedIds.has(id));
@@ -133,7 +136,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     return pageIds.filter((id) => mode.ids.has(id));
   }, [mode, pageIds]);
 
-  // Update global selection when user clicks checkboxes on this page
+  // Handle changes in row selection model
   const onRowSelectionModelChange = useCallback(
     (model: GridRowSelectionModel) => {
       const selectedOnPage = new Set<number>(model.map(Number));
@@ -156,7 +159,7 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     [mode, pageIds]
   );
 
-  // Counts and actions
+  // Compute selected count based on selection mode
   const selectedCount = useMemo(
     () =>
       mode.type === "all"
@@ -164,48 +167,50 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
         : mode.ids.size,
     [mode, total]
   );
+
+  // Selection mode handlers
   const selectAllAcrossResults = () =>
     setMode({ type: "all", deselectedIds: new Set() });
   const clearSelection = () => setMode({ type: "explicit", ids: new Set() });
-
-  // Start move job
   const [progressHintTotal, setProgressHintTotal] = useState<number | null>(null);
 
+  // Begin move operation
   async function beginMove() {
     if (!targetListId) return;
 
-    // close modal immediately so it disappears right away
     setMoveOpen(false);
 
-    // capture count for stable text
+    // Determine total selected for progress hint
     const totalSelectedNow =
       mode.type === "all"
         ? (total ?? 0) - (mode.deselectedIds?.size ?? 0)
         : mode.ids.size;
     setProgressHintTotal(totalSelectedNow);
 
+    // Prepare payload based on selection mode
     const payload =
       mode.type === "all"
         ? {
-            sourceListId: props.selectedCollectionId,
-            targetListId,
-            selection: {
-              all: true,
-              excludeIds: Array.from(mode.deselectedIds),
-            },
-          }
+          sourceListId: props.selectedCollectionId,
+          targetListId,
+          selection: {
+            all: true,
+            excludeIds: Array.from(mode.deselectedIds),
+          },
+        }
         : {
-            sourceListId: props.selectedCollectionId,
-            targetListId,
-            selection: { ids: Array.from(mode.ids) },
-          };
+          sourceListId: props.selectedCollectionId,
+          targetListId,
+          selection: { ids: Array.from(mode.ids) },
+        };
 
+    // Start move job
     const j = await startMove(payload);
     setJobId(j.jobId);
-    setJob(j); // render toast immediately with initial values
+    setJob(j);
   }
 
-  // Poll progress until done; auto-dismiss 8s after completion
+  // Poll for job status updates
   useEffect(() => {
     if (!jobId) return;
     let stop = false;
@@ -220,7 +225,6 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
           return;
         }
       } catch {
-        // ignore transient errors
       }
       if (!stop) setTimeout(tick, 10);
     };
@@ -230,165 +234,304 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
     };
   }, [jobId]);
 
+  // Render component
   return (
-  <>
-    <div style={{ height: 600, width: "100%" }}>
-      <DataGrid
-        rows={response}
-        rowHeight={30}
-        columns={[
-          { field: "liked", headerName: "Liked", width: 90 },
-          { field: "id", headerName: "ID", width: 90 },
-          { field: "company_name", headerName: "Company Name", width: 200 },
-        ]}
-        initialState={{
-          pagination: {
-            paginationModel: { page: 0, pageSize: 25 },
-          },
-        }}
-        rowCount={total ?? 0}
-        pagination
-        checkboxSelection
-        paginationMode="server"
-        onPaginationModelChange={(newMeta) => {
-          setPageSize(newMeta.pageSize);
-          setOffset(newMeta.page * newMeta.pageSize);
-        }}
-        rowSelectionModel={rowSelectionModel}
-        onRowSelectionModelChange={onRowSelectionModelChange}
-      />
-    </div>
-
-    {/* Controls BELOW the table */}
-    <Box
-      sx={{
-        mt: 1.5,
-        display: "flex",
-        justifyContent: "space-between", // keep left/right separation
-        alignItems: "center",
-        flexWrap: "wrap",
-        width: "100%",
-      }}
-    >
-      {/* Left group */}
-      <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-        <Button size="small" variant="outlined" onClick={selectAllAcrossResults}>
-          Select all {total ?? 0}
-        </Button>
-        <Button size="small" onClick={clearSelection}>
-          Clear
-        </Button>
-        <Typography variant="body2">
-          {selectedCount} selected{mode.type === "all" ? " (all pages)" : ""}
-        </Typography>
-      </Box>
-
-      {/* Right-aligned Move button */}
-      <Box>
-        <Button
-          size="small"
-          variant="contained"
-          disabled={selectedCount === 0}
-          onClick={() => {
-            setTargetListId(""); // reset default to blank
-            setMoveOpen(true);
+    <>
+      <div style={{ height: 600, width: "100%" }}>
+        <DataGrid
+          rows={response}
+          rowHeight={30}
+          columns={[
+            { field: "liked", headerName: "Liked", width: 90 },
+            { field: "id", headerName: "ID", width: 90 },
+            { field: "company_name", headerName: "Company Name", width: 200 },
+          ]}
+          initialState={{
+            pagination: {
+              paginationModel: { page: 0, pageSize: 25 },
+            },
           }}
-        >
-          Move selected to another list
-        </Button>
-      </Box>
-    </Box>
+          rowCount={total ?? 0}
+          pagination
+          checkboxSelection
+          paginationMode="server"
+          onPaginationModelChange={(newMeta) => {
+            setPageSize(newMeta.pageSize);
+            setOffset(newMeta.page * newMeta.pageSize);
+          }}
+          rowSelectionModel={rowSelectionModel}
+          onRowSelectionModelChange={onRowSelectionModelChange}
+        />
+      </div>
 
-    {/* Move modal */}
-    <Dialog open={moveOpen} onClose={() => setMoveOpen(false)}>
-      <DialogTitle>Move selected to…</DialogTitle>
-      <DialogContent sx={{ minWidth: 320, pt: 2 }}>
-        <Select
-          fullWidth
-          value={targetListId}
-          displayEmpty
-          onChange={(e) => setTargetListId(String(e.target.value))}
-        >
-          <MenuItem value="" disabled>Choose a list</MenuItem>
-            {allowedTargets.map((c) => (
-            <MenuItem key={c.id} value={c.id}>
-              {c.collection_name}
-            </MenuItem>
-          ))}
-        </Select>
-        <Typography variant="caption" sx={{ mt: 1, display: "block", color: "text.secondary" }}>
-          Runs in the background. You can keep browsing.
-        </Typography>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => setMoveOpen(false)}>Cancel</Button>
-        <Button disabled={!targetListId} variant="contained" onClick={beginMove}>
-          Move
-        </Button>
-      </DialogActions>
-    </Dialog>
-
-    {/* Progress toast */}
-    {jobId && (
-      
+      {/* Selection controls */}
       <Box
         sx={{
-          position: "fixed",
-          left: 16,
-          right: 16,
-          bottom: 16,
-          bgcolor: "#f5f7fb",
-          border: "1px solid #e3e6ee",
-          borderRadius: 1.5,
-          zIndex: 20000,
-          color: "#111",
-          boxShadow: 3,
-          overflow: "hidden",
+          mt: 1.5,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          width: "100%",
         }}
       >
-        
-        <FunFactsPanel />
-        {/* Status line */}
-        <Box
+        {/* Selection buttons and count */}
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+          <Button
+            size="small"
+            variant={mode.type === "all" ? "contained" : "outlined"}
+            onClick={() => {
+              if (mode.type === "all") {
+                clearSelection();
+              } else {
+                selectAllAcrossResults();
+              }
+            }}
+            sx={{
+              color: mode.type === "all" ? "#fff" : "#f97415",
+              backgroundColor: mode.type === "all" ? "#f97415" : "transparent",
+              borderColor: "#f97415",
+              minWidth: 120,
+              textTransform: "none",
+              boxShadow: "none",
+              outline: "none",
+              "&:hover": {
+                backgroundColor:
+                  mode.type === "all" ? "#f97415" : "rgba(249,116,21,0.08)",
+                borderColor: "#f97415",
+              },
+              "&:focus": {
+                outline: "none",
+                boxShadow: "none",
+              },
+              "&.Mui-focusVisible": {
+                outline: "none",
+                boxShadow: "none",
+              },
+              "&:active": {
+                backgroundColor: "#fbbb74",
+                borderColor: "#fbbb74",
+                color: "#fff",
+                outline: "none",
+                boxShadow: "none",
+              },
+            }}
+          >
+            {mode.type === "all" ? "DESELECT ALL" : "SELECT ALL"}
+          </Button>
+
+          {/* Clear selection button */}
+          <Button
+            size="small"
+            onClick={clearSelection}
+            sx={{
+              color: "#f97415",
+              "&:hover": { backgroundColor: "rgba(249,116,21,0.08)" },
+              "&:focus": { outline: "none", boxShadow: "none" },
+            }}>
+            CLEAR
+          </Button>
+
+          {/* Selected count display */}
+          <Typography variant="body2">
+            {selectedCount} selected{mode.type === "all" ? " (all pages)" : ""}
+          </Typography>
+        </Box>
+
+        {/* Move button */}
+        <Box>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={selectedCount === 0}
+            onClick={() => {
+              setTargetListId("");
+              setMoveOpen(true);
+            }}
+            sx={{
+              backgroundColor: "#f97415",
+              "&:hover": { backgroundColor: "#f97415" },
+              "&:active": { backgroundColor: "#fbbb74" },
+              "&:focus": {
+                outline: "none",
+                boxShadow: "none",
+              },
+              "&.Mui-focusVisible": {
+                outline: "none",
+                boxShadow: "none",
+              },
+            }}
+          >
+            Move selected to another list
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Move dialog */}
+      <Dialog
+        open={moveOpen}
+        onClose={() => setMoveOpen(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            border: "1px solid #888",
+          },
+        }}
+      >
+        <DialogTitle
           sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 2,
-            p: 1.2,
-            fontSize: 14,
+            color: "#fff",
+            fontWeight: 600,
+            fontSize: "1.1rem",
           }}
         >
-          <span>
-            {job?.status === "completed"
-              ? `Completed — moved ${((progressHintTotal ?? job?.total) ?? 0) - (job?.duplicates ?? 0)} 
-                items (${job?.duplicates ?? 0} were not moved since they were already in the target list)`
-              : job?.status === "failed"
-              ? "Failed"
-              : `In progress... ${job?.moved ?? 0} out of ${(progressHintTotal ?? job?.total) ?? 0} moved`}
-          </span>
-        </Box>
+          Move selected to...
+        </DialogTitle>
+
+        {/* List selection dropdown */}
+        <DialogContent sx={{ minWidth: 320, pt: 2 }}>
+          <Select
+            fullWidth
+            value={targetListId}
+            displayEmpty
+            onChange={(e) => setTargetListId(String(e.target.value))}
+            sx={{
+              "& .MuiOutlinedInput-notchedOutline": {
+                borderColor: "#888",
+              },
+              "&:hover .MuiOutlinedInput-notchedOutline": {
+                borderColor: "#f97415",
+              },
+              "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                borderColor: "#f97415",
+              },
+              "& .MuiSelect-icon": {
+                color: "#f97415",
+              },
+            }}
+            MenuProps={{
+              PaperProps: {
+                sx: {
+                  "& .MuiMenuItem-root.Mui-selected": {
+                    backgroundColor: "rgba(249,116,21,0.15)",
+                    color: "#f97415",
+                  },
+                  "& .MuiMenuItem-root:hover": {
+                    backgroundColor: "rgba(249,116,21,0.08)",
+                  },
+                },
+              },
+            }}
+          >
+            <MenuItem value="" disabled>
+              Choose a list
+            </MenuItem>
+            {allowedTargets.map((c) => (
+              <MenuItem key={c.id} value={c.id}>
+                {c.collection_name}
+              </MenuItem>
+            ))}
+          </Select>
+
+          {/* Background operation note */}
+          <Typography
+            variant="caption"
+            sx={{ mt: 1, display: "block", color: "#888" }}
+          >
+            This operation runs in the background. You can keep browsing companies.
+          </Typography>
+        </DialogContent>
+
+        {/* Action buttons */}
+        <DialogActions sx={{ pr: 2, pb: 1 }}>
+          <Button
+            onClick={() => setMoveOpen(false)}
+            sx={{
+              color: "#f97415",
+              "&:hover": { backgroundColor: "rgba(249,116,21,0.08)" },
+              "&:focus": { outline: "none", boxShadow: "none" },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={!targetListId}
+            variant="contained"
+            onClick={beginMove}
+            sx={{
+              backgroundColor: "#f97415",
+              color: "#fff",
+              "&:hover": { backgroundColor: "#f97415" },
+              "&:focus": { outline: "none", boxShadow: "none" },
+              "&.Mui-disabled": {
+                color: "#888",
+              },
+            }}
+          >
+            Move
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {jobId && (
         <Box
           sx={{
-            height: 6,
-            width: `${
-              job?.total ? Math.min(100, Math.round((job.moved / job.total) * 100)) : 0
-            }%`,
-            transition: "width .3s ease",
-            bgcolor:
-              job?.status === "completed" ? "#10b981"
-              : job?.status === "failed" ? "#ef4444"
-              : "#3b82f6",
+            position: "fixed",
+            left: 16,
+            right: 16,
+            bottom: 16,
+            bgcolor: "#f5f7fb",
+            border: "1px solid #e3e6ee",
+            borderRadius: 1.5,
+            zIndex: 20000,
+            color: "#111",
+            boxShadow: 3,
+            overflow: "hidden",
           }}
-        />
-      </Box>
-    )}
-  </>
-);
+        >
+
+          <FunFactsPanel />
+
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
+              p: 1.2,
+              fontSize: 14,
+            }}
+          >
+            <span>
+              {job?.status === "completed"
+                ? `Completed — moved ${((progressHintTotal ?? job?.total) ?? 0) - (job?.duplicates ?? 0)} 
+                items (${job?.duplicates ?? 0} were not moved since they were already in the target list)`
+                : job?.status === "failed"
+                  ? "Failed"
+                  : `In progress... ${job?.moved ?? 0} out of ${(progressHintTotal ?? job?.total) ?? 0} moved`}
+            </span>
+          </Box>
+          <Box
+            sx={{
+              height: 6,
+              width: `${job?.total ? Math.min(100, Math.round((job.moved / job.total) * 100)) : 0
+                }%`,
+              transition: "width .3s ease",
+              bgcolor:
+                job?.status === "completed" ? "#f97415"
+                  : job?.status === "failed" ? "#888"
+                    : "#fbbb74",
+            }}
+          />
+        </Box>
+      )}
+    </>
+  );
 };
 
 export default CompanyTable;
 
+// Fun facts component
 function FunFactsPanel() {
   const facts = [
     "Grace (who made this feature) took a gap year to go to ballet school",
@@ -421,11 +564,13 @@ function FunFactsPanel() {
   ];
   const [i, setI] = useState(0);
 
+  // Cycle through facts every 3 seconds
   useEffect(() => {
-    const id = setInterval(() => setI((x) => (x + 1) % facts.length), 3000); // 3s each
+    const id = setInterval(() => setI((x) => (x + 1) % facts.length), 3000);
     return () => clearInterval(id);
   }, []);
 
+  // Render fun facts panel
   return (
     <Box
       sx={{
@@ -438,7 +583,7 @@ function FunFactsPanel() {
           border: "1px solid #e3e6ee",
           borderRadius: 1,
           p: 1.2,
-          height: 96,          // fixed height
+          height: 96,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -446,10 +591,24 @@ function FunFactsPanel() {
           bgcolor: "#fff",
         }}
       >
-        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
+        <Typography
+          sx={{
+            mb: 0.5,
+            color: "#f97415",
+            fontWeight: 700,
+            fontSize: "1.5rem",
+          }}
+        >
           Fun facts while you wait!
         </Typography>
-        <Typography variant="body2" sx={{ opacity: 0.9 }}>
+        <Typography
+          sx={{
+            color: "#000",
+            fontSize: "1.1rem",
+            fontWeight: 500,
+            opacity: 0.95,
+          }}
+        >
           {facts[i]}
         </Typography>
       </Box>
