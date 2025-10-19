@@ -3,7 +3,7 @@
 ## Overview
 This document describes the frontend and backend updates made to enable improved list management, batch moving of companies between lists, and UX enhancements such as progress indicators and fun facts displaying during lengthy operations.
 
-Quick demo showing feature functionality: https://youtu.be/UFVPYkRJOZA
+Video demo showing feature functionality: https://youtu.be/UFVPYkRJOZA
 
 ---
 
