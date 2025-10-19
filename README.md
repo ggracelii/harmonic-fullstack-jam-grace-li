@@ -70,4 +70,16 @@ If a job fails, the backend saves the exception string in `message`, which is th
 
 ---
 
+## Reflection
+
+In designing and implementing this feature, my goal was to create an intuitive, responsive, and non-blocking user experience for managing company collections. I wanted users to be able to select companies and move them between lists seamlessly without disrupting their workflow. To achieve this, I built a cross-page selection model that supports "Select All" functionality and a background job system that runs asynchronously, with real-time progress updates displayed through a dynamic progress bar and a rotating "Fun Facts" panel. The color scheme was intentionally designed to match the Harmonic brand aesthetic, ensuring a cohesive and visually polished experience that feels integrated with the rest of the platform.
+
+From a technical perspective, the implementation balances simplicity, scalability, and user experience. The backend uses asynchronous job execution with periodic polling for status updates, and PostgreSQL’s ON CONFLICT DO NOTHING upserts to ensure idempotency and prevent duplicate entries. While I could have optimized for raw performance by using larger batch sizes (e.g., moving several hundred items per update), I chose smaller batches to enable a more dynamic and visually engaging progress bar. The continuous movement of the progress indicator reinforces user trust that the system is actively working, which I believe is more valuable from a UX standpoint. On the frontend, I focused on maintaining responsiveness and clear feedback, allowing users to continue browsing and interacting even while background operations run.
+
+If I were to continue developing this feature, I would focus on two main enhancements:
+1. Adding a cancel job capability so users can interrupt long-running operations
+2. Introducing a queueing and throttling mechanism for job scheduling to handle concurrent moves gracefully. 
+
+Overall, this project reinforced my belief that strong UX design (clear visual feedback, responsive controls, and details like the Fun Facts panel) can make even complex backend processes feel smooth, engaging, and human-centered.
+
 **Note:** In `backend/Dockerfile`, I added the `--no-root` flag to the `RUN` command to resolve errors that occurred when running the application. Other than this and the addition of  `backend/backend/routes/moves.py`, the deployment process and file structure remain unchanged.
