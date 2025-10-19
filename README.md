@@ -11,10 +11,10 @@ Video demo showing feature functionality: https://youtu.be/UFVPYkRJOZA
 These edits all took place in `frontend/src/components/CompanyTable.tsx`.
 
 ### 1. Cross-Page Selection
-Users can now select individual companies or use the new **“Select all”** feature to select every item across all pages of the company table.
+Users can now select individual companies or use the new **Select all** feature to select every item across all pages of the company table.
 
 ### 2. Clear Selection
-A **“Clear”** button was added to reset all selections instantly.
+A **Clear** button was added to reset all selections instantly.
 
 ### 3. Move Modal
 Clicking **“Move selected to another list”** opens a modal window that lists only eligible destination lists.  
@@ -28,9 +28,9 @@ The modal filters which lists can be moved to based on the current list:
 
 ### 5. Progress Bar
 A  **progress bar** shows the status of each background move job in real time.
-- Blue: active progress  
-- Green: completed  
-- Red: failed  
+- Light orange: active progress  
+- Dark orange: completed  
+- Gray: failed  
 When a job completes successfully, a message displays the total number of items moved and the number of duplicates skipped.
 
 If the job fails, a failure message is shown instead.
@@ -38,7 +38,7 @@ If the job fails, a failure message is shown instead.
 Both messages automatically disappear after 8 seconds.
 
 ### 6. Fun Facts Panel
-A  **“Fun facts”** box appears above the progress text/bar.  
+A  **Fun Facts** box appears above the progress text/bar.  
 
 It cycles through short rotating fun facts every 3 seconds during the move operation to keep the user entertained.
 
