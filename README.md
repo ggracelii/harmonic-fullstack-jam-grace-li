@@ -3,6 +3,8 @@
 ## Overview
 This document describes the frontend and backend updates made to enable improved list management, batch moving of companies between lists, and UX enhancements such as progress indicators and fun facts displaying during lengthy operations.
 
+Quick demo showing feature functionality: https://youtu.be/UFVPYkRJOZA
+
 ---
 
 ## Frontend Enhancements
@@ -17,7 +19,6 @@ A **“Clear”** button was added to reset all selections instantly.
 ### 3. Move Modal
 Clicking **“Move selected to another list”** opens a modal window that lists only eligible destination lists.  
 The default value is blank, ensuring users must intentionally pick a valid list.
-Users can add from "My List" to either of the other two lists. Users cannot add from either of those tow lists to My List. sicne that contains all the companeis and wouldnt' make logical sense to add companies there
 
 ### 4. Filtered Move Rules
 The modal filters which lists can be moved to based on the current list:
@@ -31,12 +32,18 @@ A  **progress bar** shows the status of each background move job in real time.
 - Green: completed  
 - Red: failed  
 When a job completes successfully, a message displays the total number of items moved and the number of duplicates skipped.
+
 If the job fails, a failure message is shown instead.
+
 Both messages automatically disappear after 8 seconds.
 
 ### 6. Fun Facts Panel
 A  **“Fun facts”** box appears above the progress text/bar.  
+
 It cycles through short rotating fun facts every 3 seconds during the move operation to keep the user entertained.
+
+### 7. Color Scheme
+Kept the orange color scheme consistent across all elements to maintain a cohesive aesthetic.
 
 ---
 

@@ -503,12 +503,24 @@ const CompanyTable = (props: { selectedCollectionId: string }) => {
             }}
           >
             <span>
-              {job?.status === "completed"
-                ? `Completed — moved ${((progressHintTotal ?? job?.total) ?? 0) - (job?.duplicates ?? 0)} 
-                items (${job?.duplicates ?? 0} were not moved since they were already in the target list)`
-                : job?.status === "failed"
-                  ? "Failed"
-                  : `In progress... ${job?.moved ?? 0} out of ${(progressHintTotal ?? job?.total) ?? 0} moved`}
+              {job?.status === "completed" ? (() => {
+                  const totalMoved =
+                    ((progressHintTotal ?? job?.total) ?? 0) - (job?.duplicates ?? 0);
+                  const dups = job?.duplicates ?? 0;
+
+                  // Singular vs plural message for duplicates
+                  const duplicateMsg =
+                    dups === 0
+                      ? ""
+                      : dups === 1
+                      ? " (1 item was not moved since it was already in the target list)"
+                      : ` (${dups} items were not moved since they were already in the target list)`;
+
+                  return `Completed — moved ${totalMoved} item${totalMoved === 1 ? "" : "s"}${duplicateMsg}`;
+                })()
+              : job?.status === "failed"
+              ? "Failed"
+              : `In progress... ${job?.moved ?? 0} out of ${(progressHintTotal ?? job?.total) ?? 0} moved`}
             </span>
           </Box>
           <Box
